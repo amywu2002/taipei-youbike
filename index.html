@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <title>台北 YouBike 即時地圖</title>
 
-  <!-- Leaflet -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -23,7 +22,6 @@
       display: flex;
       gap: 12px;
       align-items: center;
-      z-index: 1000;
     }
 
     #search {
@@ -53,7 +51,6 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      line-height: 1.1;
       border: 2px solid #fff;
       box-shadow: 0 0 4px rgba(0,0,0,0.4);
     }
@@ -61,7 +58,7 @@
     .circle .line {
       width: 60%;
       height: 1px;
-      background: rgba(255,255,255,0.8);
+      background: rgba(255,255,255,0.9);
       margin: 2px 0;
     }
 
@@ -79,7 +76,6 @@
 
 <div id="map"></div>
 
-<!-- Leaflet -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
@@ -93,11 +89,11 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 
 let markers = [];
-let allData = [];
+let stations = [];
 
-function getColor(sbi, bemp) {
-  if (sbi === 0) return "yellow";
-  if (bemp === 0) return "red";
+function getColor(bike, space) {
+  if (bike === 0) return "yellow";
+  if (space === 0) return "red";
   return "green";
 }
 
@@ -106,38 +102,34 @@ function clearMarkers() {
   markers = [];
 }
 
-function render(filterText = "") {
+function render(keyword = "") {
   clearMarkers();
 
-  allData
-    .filter(s =>
-      s.sna.includes(filterText)
-    )
+  stations
+    .filter(s => s.name.includes(keyword))
     .forEach(s => {
-      const color = getColor(s.sbi, s.bemp);
-
-      const html = `
-        <div class="circle ${color}">
-          <div>${s.sbi}</div>
-          <div class="line"></div>
-          <div>${s.bemp}</div>
-        </div>
-      `;
+      const color = getColor(s.available, s.empty);
 
       const icon = L.divIcon({
-        html,
         className: "",
         iconSize: [42, 42],
-        iconAnchor: [21, 21]
+        iconAnchor: [21, 21],
+        html: `
+          <div class="circle ${color}">
+            <div>${s.available}</div>
+            <div class="line"></div>
+            <div>${s.empty}</div>
+          </div>
+        `
       });
 
       const marker = L.marker([s.lat, s.lng], { icon }).addTo(map);
 
       marker.bindPopup(`
-        <b>${s.sna}</b><br>
-        🚲 可借：${s.sbi}<br>
-        🅿️ 可還：${s.bemp}<br>
-        🔢 總車柱：${s.tot}
+        <b>${s.name}</b><br>
+        🚲 可借：${s.available}<br>
+        🅿️ 可還：${s.empty}<br>
+        🔢 總車柱：${s.total}
       `);
 
       markers.push(marker);
@@ -149,23 +141,28 @@ async function loadData() {
     const res = await fetch(API);
     const data = await res.json();
 
-    allData = data.map(d => ({
-      sna: d.sna.replace("YouBike2.0_", ""),
-      sbi: Number(d.sbi),
-      bemp: Number(d.bemp),
-      tot: Number(d.tot),
-      lat: Number(d.lat),
-      lng: Number(d.lng)
-    }));
+    stations = data
+      .filter(d =>
+        d.isact === "1" &&
+        !isNaN(Number(d.lat)) &&
+        !isNaN(Number(d.lng))
+      )
+      .map(d => ({
+        name: d.sna.replace("YouBike2.0_", ""),
+        lat: Number(d.lat),
+        lng: Number(d.lng),
+        available: Number(d.sbi),
+        empty: Number(d.bemp),
+        total: Number(d.tot)
+      }));
 
     render(document.getElementById("search").value);
 
     document.getElementById("updated").textContent =
       "最後更新：" + new Date().toLocaleTimeString();
-  } catch (err) {
-    document.getElementById("updated").textContent =
-      "資料載入失敗";
-    console.error(err);
+  } catch (e) {
+    document.getElementById("updated").textContent = "資料載入失敗";
+    console.error(e);
   }
 }
 
@@ -179,3 +176,4 @@ setInterval(loadData, 30000);
 
 </body>
 </html>
+
