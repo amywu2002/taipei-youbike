@@ -1,170 +1,74 @@
+
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <title>台北 YouBike 即時地圖</title>
-
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
-
-  <style>
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont;
-    }
-
-    #map {
-      height: 100vh;
-      width: 100%;
-    }
-
-    /* 搜尋框 */
-    #searchBox {
-      position: absolute;
-      top: 10px;
-      left: 50px;
-      z-index: 1000;
-      padding: 8px 12px;
-      font-size: 14px;
-      width: 220px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    }
-
-    /* 更新時間 */
-    #updateTime {
-      position: absolute;
-      bottom: 10px;
-      right: 10px;
-      z-index: 1000;
-      background: rgba(0,0,0,0.7);
-      color: #fff;
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-size: 13px;
-    }
-
-    /* 圓形站點 */
-    .bike-circle {
-      width: 46px;
-      height: 46px;
-      border-radius: 50%;
-      color: #fff;
-      font-size: 14px;
-      font-weight: bold;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      border: 2px solid #fff;
-      box-shadow: 0 0 4px rgba(0,0,0,0.5);
-      line-height: 1.1;
-    }
-
-    .green { background: #2ecc71; }
-    .yellow { background: #f1c40f; }
-    .red { background: #e74c3c; }
-
-    .divider {
-      width: 60%;
-      height: 1px;
-      background: rgba(255,255,255,0.9);
-      margin: 2px 0;
-    }
-
-    .popup b {
-      font-size: 16px;
-    }
-  </style>
+<meta charset="UTF-8" />
+<title>台北 YouBike 即時地圖</title>
+https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
+<style>
+  body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont; }
+  #search {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    z-index: 1000; padding: 8px 12px; width: 260px; font-size: 16px;
+  }
+  #map { height: 100vh; width: 100%; }
+  .circle {
+    width: 52px; height: 52px; border-radius: 50%;
+    color: white; text-align: center; font-size: 12px; line-height: 1.1;
+    padding-top: 6px; box-sizing: border-box; font-weight: bold;
+  }
+  .green { background: #2ecc71; }
+  .yellow { background: #f1c40f; color: #333; }
+  .red { background: #e74c3c; }
+  .divider { border-top: 1px solid rgba(255,255,255,.6); margin: 2px 6px; }
+</style>
 </head>
 <body>
-
-<input id="searchBox" placeholder="搜尋站名…" />
-<div id="updateTime">🕒 載入中...</div>
+<input id="search" placeholder="搜尋場站名稱…" />
 <div id="map"></div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+https://unpkg.com/leaflet@1.9.4/dist/leaflet.js
 <script>
+const API = "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
 const map = L.map("map").setView([25.04, 121.53], 13);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: "© OpenStreetMap"
-}).addTo(map);
+let markers = [], rawData = [];
+function clearMarkers() { markers.forEach(m => map.removeLayer(m)); markers = []; }
+function getColor(avail, empty) { if (avail === 0) return "yellow"; if (empty === 0) return "red"; return "green"; }
 
-let allData = [];
-let markers = [];
-
-function clearMarkers() {
-  markers.forEach(m => map.removeLayer(m));
-  markers = [];
-}
-
-function renderStations(keyword = "") {
+function render(list) {
   clearMarkers();
-
-  allData
-    .filter(st => st.name.toLowerCase().includes(keyword.toLowerCase()))
-    .forEach(st => {
-      const icon = L.divIcon({
-        className: "",
-        html: `
-          <div class="bike-circle ${st.color}">
-            <div>${st.available}</div>
-            <div class="divider"></div>
-            <div>${st.empty}</div>
-          </div>
-        `,
-        iconSize: [46, 46],
-        iconAnchor: [23, 23]
-      });
-
-      const marker = L.marker([st.lat, st.lng], { icon }).addTo(map);
-
-      marker.bindPopup(`
-        <div class="popup">
-          <b>${st.name}</b><br>
-          🚲 可借：${st.available}<br>
-          🅿️ 可還：${st.empty}<br>
-          🔢 車柱總數：${st.total}
-        </div>
-      `);
-
-      markers.push(marker);
+  list.forEach(s => {
+    const lat = Number(s.lat), lng = Number(s.lng);
+    if (isNaN(lat) || isNaN(lng)) return;
+    const available = Number(s.sbi), empty = Number(s.bemp), total = Number(s.tot);
+    const icon = L.divIcon({
+      className: "",
+      html: `<div class="circle ${getColor(available, empty)}">借 ${available}<div class="divider"></div>還 ${empty}</div>`,
+      iconSize: [52, 52]
     });
+    const marker = L.marker([lat, lng], { icon }).addTo(map);
+    marker.bindPopup(`<b>${s.sna}</b><br>🚲 可借：${available}<br>🅿️ 可還：${empty}<br>📍 車柱總數：${total}`);
+    markers.push(marker);
+  });
 }
 
-/* 更新時間顯示 */
-function updateTimeLabel() {
-  const now = new Date();
-  const text = now.toLocaleString("zh-TW", { hour12: false });
-  document.getElementById("updateTime").innerText =
-    "🕒 最後更新：" + text;
+async function loadData() {
+  try {
+    const res = await fetch(API, { cache: "no-store" });
+    const data = await res.json();
+    rawData = data;
+    render(rawData);
+  } catch (e) { alert("資料載入失敗（API）"); console.error(e); }
 }
 
-function loadYouBike() {
-  fetch("/api/youbike")
-    .then(res => res.json())
-    .then(data => {
-      allData = data;
-      renderStations(document.getElementById("searchBox").value);
-      updateTimeLabel();
-    })
-    .catch(err => {
-      console.error("資料載入失敗", err);
-    });
-}
-
-document.getElementById("searchBox").addEventListener("input", e => {
-  renderStations(e.target.value);
+document.getElementById("search").addEventListener("input", e => {
+  const keyword = e.target.value.trim();
+  render(rawData.filter(s => s.sna.includes(keyword)));
 });
 
-loadYouBike();
-setInterval(loadYouBike, 30000);
+loadData();
+setInterval(loadData, 30000);
 </script>
-
 </body>
 </html>
