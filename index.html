@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>台北 YouBike 即時地圖</title>
 
+  <!-- Leaflet -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -16,16 +17,15 @@
     }
 
     #topbar {
-      padding: 8px 12px;
-      background: #fff;
-      border-bottom: 1px solid #ddd;
+      padding: 10px;
+      background: #f7f7f7;
       display: flex;
-      gap: 12px;
+      gap: 10px;
       align-items: center;
     }
 
     #search {
-      padding: 6px 8px;
+      padding: 6px 10px;
       font-size: 14px;
       width: 220px;
     }
@@ -36,29 +36,29 @@
     }
 
     #map {
-      height: calc(100vh - 46px);
+      height: calc(100vh - 50px);
       width: 100%;
     }
 
+    /* 圓形圖示 */
     .circle {
       width: 42px;
       height: 42px;
       border-radius: 50%;
-      color: #fff;
-      font-size: 12px;
+      color: white;
+      font-size: 13px;
       font-weight: bold;
       display: flex;
       flex-direction: column;
-      justify-content: center;
       align-items: center;
-      border: 2px solid #fff;
-      box-shadow: 0 0 4px rgba(0,0,0,0.4);
+      justify-content: center;
+      line-height: 1;
     }
 
     .circle .line {
-      width: 60%;
-      height: 1px;
-      background: rgba(255,255,255,0.9);
+      width: 70%;
+      height: 2px;
+      background: white;
       margin: 2px 0;
     }
 
@@ -76,13 +76,16 @@
 
 <div id="map"></div>
 
+<!-- Leaflet -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
+/* ========= 基本設定 ========= */
+
 const API =
   "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
 
-const map = L.map("map").setView([25.0375, 121.5637], 13);
+const map = L.map("map").setView([25.04, 121.53], 12);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap"
@@ -91,16 +94,65 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 let markers = [];
 let stations = [];
 
-function getColor(bike, space) {
-  if (bike === 0) return "yellow";
-  if (space === 0) return "red";
-  return "green";
-}
+/* ========= 工具 ========= */
 
 function clearMarkers() {
   markers.forEach(m => map.removeLayer(m));
   markers = [];
 }
+
+function isValidLatLng(lat, lng) {
+  return (
+    typeof lat === "number" &&
+    typeof lng === "number" &&
+    !isNaN(lat) &&
+    !isNaN(lng)
+  );
+}
+
+function getColor(available, empty) {
+  if (available === 0) return "yellow";
+  if (empty === 0) return "red";
+  return "green";
+}
+
+/* ========= 資料載入 ========= */
+
+async function loadData() {
+  try {
+    const res = await fetch(API);
+    const raw = await res.json();
+
+    stations = raw
+      .filter(d => d.isact === "1")
+      .map(d => {
+        const lat = parseFloat(d.lat);
+        const lng = parseFloat(d.lng);
+
+        return {
+          name: d.sna.replace("YouBike2.0_", ""),
+          lat,
+          lng,
+          available: Number(d.sbi),
+          empty: Number(d.bemp),
+          total: Number(d.tot)
+        };
+      })
+      // ⭐ 關鍵防呆：完全阻擋 NaN
+      .filter(s => isValidLatLng(s.lat, s.lng));
+
+    render(document.getElementById("search").value);
+
+    document.getElementById("updated").textContent =
+      "最後更新：" + new Date().toLocaleTimeString();
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById("updated").textContent = "資料載入失敗";
+  }
+}
+
+/* ========= 地圖渲染 ========= */
 
 function render(keyword = "") {
   clearMarkers();
@@ -136,44 +188,17 @@ function render(keyword = "") {
     });
 }
 
-async function loadData() {
-  try {
-    const res = await fetch(API);
-    const data = await res.json();
-
-    stations = data
-      .filter(d =>
-        d.isact === "1" &&
-        !isNaN(Number(d.lat)) &&
-        !isNaN(Number(d.lng))
-      )
-      .map(d => ({
-        name: d.sna.replace("YouBike2.0_", ""),
-        lat: Number(d.lat),
-        lng: Number(d.lng),
-        available: Number(d.sbi),
-        empty: Number(d.bemp),
-        total: Number(d.tot)
-      }));
-
-    render(document.getElementById("search").value);
-
-    document.getElementById("updated").textContent =
-      "最後更新：" + new Date().toLocaleTimeString();
-  } catch (e) {
-    document.getElementById("updated").textContent = "資料載入失敗";
-    console.error(e);
-  }
-}
+/* ========= 事件 ========= */
 
 document.getElementById("search").addEventListener("input", e => {
   render(e.target.value);
 });
 
+/* ========= 啟動 ========= */
+
 loadData();
-setInterval(loadData, 30000);
+setInterval(loadData, 30000); // 每 30 秒更新
 </script>
 
 </body>
 </html>
-
