@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <title>台北 YouBike 即時地圖</title>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont;
+    }
+
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
+
+    /* 搜尋框 */
+    #searchBox {
+      position: absolute;
+      top: 10px;
+      left: 50px;
+      z-index: 1000;
+      padding: 8px 12px;
+      font-size: 14px;
+      width: 220px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
+    /* 更新時間 */
+    #updateTime {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    /* 圓形站點 */
+    .bike-circle {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 14px;
+      font-weight: bold;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #fff;
+      box-shadow: 0 0 4px rgba(0,0,0,0.5);
+      line-height: 1.1;
+    }
+
+    .green { background: #2ecc71; }
+    .yellow { background: #f1c40f; }
+    .red { background: #e74c3c; }
+
+    .divider {
+      width: 60%;
+      height: 1px;
+      background: rgba(255,255,255,0.9);
+      margin: 2px 0;
+    }
+
+    .popup b {
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<input id="searchBox" placeholder="搜尋站名…" />
+<div id="updateTime">🕒 載入中...</div>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+const map = L.map("map").setView([25.04, 121.53], 13);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "© OpenStreetMap"
+}).addTo(map);
+
+let allData = [];
+let markers = [];
+
+function clearMarkers() {
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+}
+
+function renderStations(keyword = "") {
+  clearMarkers();
+
+  allData
+    .filter(st => st.name.toLowerCase().includes(keyword.toLowerCase()))
+    .forEach(st => {
+      const icon = L.divIcon({
+        className: "",
+        html: `
+          <div class="bike-circle ${st.color}">
+            <div>${st.available}</div>
+            <div class="divider"></div>
+            <div>${st.empty}</div>
+          </div>
+        `,
+        iconSize: [46, 46],
+        iconAnchor: [23, 23]
+      });
+
+      const marker = L.marker([st.lat, st.lng], { icon }).addTo(map);
+
+      marker.bindPopup(`
+        <div class="popup">
+          <b>${st.name}</b><br>
+          🚲 可借：${st.available}<br>
+          🅿️ 可還：${st.empty}<br>
+          🔢 車柱總數：${st.total}
+        </div>
+      `);
+
+      markers.push(marker);
+    });
+}
+
+/* 更新時間顯示 */
+function updateTimeLabel() {
+  const now = new Date();
+  const text = now.toLocaleString("zh-TW", { hour12: false });
+  document.getElementById("updateTime").innerText =
+    "🕒 最後更新：" + text;
+}
+
+function loadYouBike() {
+  fetch("/api/youbike")
+    .then(res => res.json())
+    .then(data => {
+      allData = data;
+      renderStations(document.getElementById("searchBox").value);
+      updateTimeLabel();
+    })
+    .catch(err => {
+      console.error("資料載入失敗", err);
+    });
+}
+
+document.getElementById("searchBox").addEventListener("input", e => {
+  renderStations(e.target.value);
+});
+
+loadYouBike();
+setInterval(loadYouBike, 30000);
+</script>
+
+</body>
+</html>
