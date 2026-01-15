@@ -10,8 +10,26 @@
 />
 
 <style>
-  body { margin: 0; font-family: system-ui; }
-  #map { height: 100vh; width: 100%; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont;
+  }
+
+  #search {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    padding: 8px 12px;
+    width: 260px;
+    font-size: 16px;
+  }
+
+  #map {
+    height: 100vh;
+    width: 100%;
+  }
 
   .circle {
     width: 52px;
@@ -25,6 +43,7 @@
     box-sizing: border-box;
     font-weight: bold;
   }
+
   .green { background: #2ecc71; }
   .yellow { background: #f1c40f; color: #333; }
   .red { background: #e74c3c; }
@@ -37,6 +56,8 @@
 </head>
 
 <body>
+
+<input id="search" placeholder="搜尋場站名稱…" />
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -46,11 +67,13 @@ const API =
   "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
 
 const map = L.map("map").setView([25.04, 121.53], 13);
+
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap"
 }).addTo(map);
 
 let markers = [];
+let rawData = [];
 
 function clearMarkers() {
   markers.forEach(m => map.removeLayer(m));
@@ -63,56 +86,68 @@ function getColor(avail, empty) {
   return "green";
 }
 
+function render(list) {
+  clearMarkers();
+
+  list.forEach(s => {
+    const lat = Number(s.lat);
+    const lng = Number(s.lng);
+
+    if (isNaN(lat) || isNaN(lng)) return;
+
+    const available = Number(s.available_rent_bikes);
+    const empty = Number(s.available_return_bikes);
+    const total = Number(s.total);
+
+    const color = getColor(available, empty);
+
+    const icon = L.divIcon({
+      className: "",
+      html: `
+        <div class="circle ${color}">
+          借 ${available}
+          <div class="divider"></div>
+          還 ${empty}
+        </div>
+      `,
+      iconSize: [52, 52]
+    });
+
+    const marker = L.marker([lat, lng], { icon }).addTo(map);
+
+    marker.bindPopup(`
+      <b>${s.sna}</b><br>
+      🚲 可借：${available}<br>
+      🅿️ 可還：${empty}<br>
+      📍 車柱總數：${total}
+    `);
+
+    markers.push(marker);
+  });
+}
+
 async function loadData() {
   try {
     const res = await fetch(API, { cache: "no-store" });
     const data = await res.json();
-
-    clearMarkers();
-
-    data.forEach(s => {
-      const lat = Number(s.lat);
-      const lng = Number(s.lng);
-
-      if (isNaN(lat) || isNaN(lng)) return;
-
-      const available = Number(s.available_rent_bikes);
-      const empty = Number(s.available_return_bikes);
-      const total = Number(s.total);
-
-      const color = getColor(available, empty);
-
-      const icon = L.divIcon({
-        className: "",
-        html: `
-          <div class="circle ${color}">
-            借 ${available}
-            <div class="divider"></div>
-            還 ${empty}
-          </div>
-        `,
-        iconSize: [52, 52]
-      });
-
-      const marker = L.marker([lat, lng], { icon }).addTo(map);
-      marker.bindPopup(`
-        <b>${s.sna}</b><br>
-        🚲 可借：${available}<br>
-        🅿️ 可還：${empty}<br>
-        📍 車柱總數：${total}
-      `);
-
-      markers.push(marker);
-    });
-
+    rawData = data;
+    render(rawData);
   } catch (e) {
     alert("資料載入失敗（API）");
     console.error(e);
   }
 }
 
+document.getElementById("search").addEventListener("input", e => {
+  const keyword = e.target.value.trim();
+  render(
+    rawData.filter(s => s.sna.includes(keyword))
+  );
+});
+
 loadData();
 setInterval(loadData, 30000);
 </script>
+
 </body>
 </html>
