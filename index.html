@@ -74,7 +74,7 @@ async function loadData() {
       const lat = Number(s.lat);
       const lng = Number(s.lng);
 
-      if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
+      if (isNaN(lat) || isNaN(lng)) return;
 
       const available = Number(s.available_rent_bikes);
       const empty = Number(s.available_return_bikes);
