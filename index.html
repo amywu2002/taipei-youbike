@@ -1,13 +1,12 @@
+
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8" />
 <title>台北 YouBike 即時地圖</title>
 
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
+<!-- Leaflet CSS -->
+https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
 
 <style>
   body {
@@ -60,7 +59,8 @@
 <input id="search" placeholder="搜尋場站名稱…" />
 <div id="map"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet JS -->
+https://unpkg.com/leaflet@1.9.4/dist/leaflet.js
 
 <script>
 const API =
@@ -81,8 +81,8 @@ function clearMarkers() {
 }
 
 function getColor(avail, empty) {
-  if (avail === 0) return "yellow";
-  if (empty === 0) return "red";
+  if (avail === 0) return "yellow"; // 沒車可借
+  if (empty === 0) return "red";    // 沒空位可還
   return "green";
 }
 
@@ -92,12 +92,11 @@ function render(list) {
   list.forEach(s => {
     const lat = Number(s.lat);
     const lng = Number(s.lng);
-
     if (isNaN(lat) || isNaN(lng)) return;
 
-    const available = Number(s.available_rent_bikes);
-    const empty = Number(s.available_return_bikes);
-    const total = Number(s.total);
+    const available = Number(s.sbi);   // 可借車數
+    const empty = Number(s.bemp);      // 可還空位數
+    const total = Number(s.tot);       // 總車柱
 
     const color = getColor(available, empty);
 
