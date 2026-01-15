@@ -1,61 +1,64 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <title>台北 YouBike 即時地圖</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- Leaflet -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
-    body { margin: 0; font-family: Arial, sans-serif; }
-    #map { height: 100vh; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont;
+    }
 
-    .top-bar {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: white;
+    #topbar {
       padding: 8px 12px;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,.2);
-      z-index: 1000;
+      background: #fff;
+      border-bottom: 1px solid #ddd;
       display: flex;
-      gap: 10px;
+      gap: 12px;
       align-items: center;
+      z-index: 1000;
     }
 
-    .top-bar input {
-      padding: 4px 8px;
+    #search {
+      padding: 6px 8px;
       font-size: 14px;
+      width: 220px;
     }
 
-    .update-time {
-      font-size: 12px;
+    #updated {
+      font-size: 13px;
       color: #555;
     }
 
-    .bike-circle {
-      width: 48px;
-      height: 48px;
+    #map {
+      height: calc(100vh - 46px);
+      width: 100%;
+    }
+
+    .circle {
+      width: 42px;
+      height: 42px;
       border-radius: 50%;
+      color: #fff;
+      font-size: 12px;
+      font-weight: bold;
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      color: white;
-      font-size: 12px;
-      font-weight: bold;
       line-height: 1.1;
+      border: 2px solid #fff;
+      box-shadow: 0 0 4px rgba(0,0,0,0.4);
     }
 
-    .bike-circle .line {
+    .circle .line {
       width: 60%;
       height: 1px;
       background: rgba(255,255,255,0.8);
@@ -69,87 +72,112 @@
 </head>
 <body>
 
-<div class="top-bar">
-  <input id="search" placeholder="搜尋站名">
-  <div class="update-time" id="updateTime">更新中…</div>
+<div id="topbar">
+  <input id="search" placeholder="搜尋站名…" />
+  <span id="updated">載入中…</span>
 </div>
 
 <div id="map"></div>
 
+<!-- Leaflet -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <script>
-  const map = L.map("map").setView([25.04, 121.54], 13);
+const API =
+  "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "© OpenStreetMap"
-  }).addTo(map);
+const map = L.map("map").setView([25.0375, 121.5637], 13);
 
-  let markers = [];
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "© OpenStreetMap"
+}).addTo(map);
 
-  function getColor(available) {
-    if (available === 0) return "red";
-    if (available <= 5) return "yellow";
-    return "green";
-  }
+let markers = [];
+let allData = [];
 
-  function createIcon(available, empty) {
-    const color = getColor(available);
-    return L.divIcon({
-      className: "",
-      html: `
-        <div class="bike-circle ${color}">
-          <div>${available}</div>
+function getColor(sbi, bemp) {
+  if (sbi === 0) return "yellow";
+  if (bemp === 0) return "red";
+  return "green";
+}
+
+function clearMarkers() {
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+}
+
+function render(filterText = "") {
+  clearMarkers();
+
+  allData
+    .filter(s =>
+      s.sna.includes(filterText)
+    )
+    .forEach(s => {
+      const color = getColor(s.sbi, s.bemp);
+
+      const html = `
+        <div class="circle ${color}">
+          <div>${s.sbi}</div>
           <div class="line"></div>
-          <div>${empty}</div>
+          <div>${s.bemp}</div>
         </div>
-      `,
-      iconSize: [48, 48]
-    });
-  }
+      `;
 
-  async function loadData() {
-    try {
-      const res = await fetch(
-        "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json"
-      );
-      const data = await res.json();
-
-      markers.forEach(m => map.removeLayer(m));
-      markers = [];
-
-      const keyword = document.getElementById("search").value.trim();
-
-      data.forEach(st => {
-        if (keyword && !st.sna.includes(keyword)) return;
-
-        const marker = L.marker([st.lat, st.lng], {
-          icon: createIcon(st.sbi, st.bemp)
-        }).addTo(map);
-
-        marker.bindPopup(`
-          <b>${st.sna}</b><br>
-          可借：${st.sbi}<br>
-          可還：${st.bemp}<br>
-          總車柱：${st.tot}
-        `);
-
-        markers.push(marker);
+      const icon = L.divIcon({
+        html,
+        className: "",
+        iconSize: [42, 42],
+        iconAnchor: [21, 21]
       });
 
-      document.getElementById("updateTime").textContent =
-        "最後更新：" + new Date().toLocaleTimeString();
+      const marker = L.marker([s.lat, s.lng], { icon }).addTo(map);
 
-    } catch (err) {
-      document.getElementById("updateTime").textContent = "資料載入失敗";
-      console.error(err);
-    }
+      marker.bindPopup(`
+        <b>${s.sna}</b><br>
+        🚲 可借：${s.sbi}<br>
+        🅿️ 可還：${s.bemp}<br>
+        🔢 總車柱：${s.tot}
+      `);
+
+      markers.push(marker);
+    });
+}
+
+async function loadData() {
+  try {
+    const res = await fetch(API);
+    const data = await res.json();
+
+    allData = data.map(d => ({
+      sna: d.sna.replace("YouBike2.0_", ""),
+      sbi: Number(d.sbi),
+      bemp: Number(d.bemp),
+      tot: Number(d.tot),
+      lat: Number(d.lat),
+      lng: Number(d.lng)
+    }));
+
+    render(document.getElementById("search").value);
+
+    document.getElementById("updated").textContent =
+      "最後更新：" + new Date().toLocaleTimeString();
+  } catch (err) {
+    document.getElementById("updated").textContent =
+      "資料載入失敗";
+    console.error(err);
   }
+}
 
-  document.getElementById("search").addEventListener("input", loadData);
+document.getElementById("search").addEventListener("input", e => {
+  render(e.target.value);
+});
 
-  loadData();
-  setInterval(loadData, 30000);
+loadData();
+setInterval(loadData, 30000);
 </script>
 
 </body>
 </html>
+
 
