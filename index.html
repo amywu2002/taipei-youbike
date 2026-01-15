@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <title>台北 YouBike 即時地圖</title>
 
-  <!-- Leaflet -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -16,168 +15,159 @@
       font-family: system-ui, -apple-system, BlinkMacSystemFont;
     }
 
-    #topbar {
-      padding: 8px 12px;
-      background: #fff;
-      border-bottom: 1px solid #ddd;
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      z-index: 1000;
-    }
-
-    #search {
-      padding: 6px 8px;
-      font-size: 14px;
-      width: 220px;
-    }
-
-    #updated {
-      font-size: 13px;
-      color: #555;
-    }
-
     #map {
-      height: calc(100vh - 46px);
+      height: 100vh;
       width: 100%;
     }
 
-    .circle {
-      width: 42px;
-      height: 42px;
+    /* 搜尋框 */
+    #searchBox {
+      position: absolute;
+      top: 10px;
+      left: 50px;
+      z-index: 1000;
+      padding: 8px 12px;
+      font-size: 14px;
+      width: 220px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
+    /* 更新時間 */
+    #updateTime {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    /* 圓形站點 */
+    .bike-circle {
+      width: 46px;
+      height: 46px;
       border-radius: 50%;
       color: #fff;
-      font-size: 12px;
+      font-size: 14px;
       font-weight: bold;
       display: flex;
       flex-direction: column;
-      justify-content: center;
       align-items: center;
-      line-height: 1.1;
+      justify-content: center;
       border: 2px solid #fff;
-      box-shadow: 0 0 4px rgba(0,0,0,0.4);
-    }
-
-    .circle .line {
-      width: 60%;
-      height: 1px;
-      background: rgba(255,255,255,0.8);
-      margin: 2px 0;
+      box-shadow: 0 0 4px rgba(0,0,0,0.5);
+      line-height: 1.1;
     }
 
     .green { background: #2ecc71; }
     .yellow { background: #f1c40f; }
     .red { background: #e74c3c; }
+
+    .divider {
+      width: 60%;
+      height: 1px;
+      background: rgba(255,255,255,0.9);
+      margin: 2px 0;
+    }
+
+    .popup b {
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
 
-<div id="topbar">
-  <input id="search" placeholder="搜尋站名…" />
-  <span id="updated">載入中…</span>
-</div>
-
+<input id="searchBox" placeholder="搜尋站名…" />
+<div id="updateTime">🕒 載入中...</div>
 <div id="map"></div>
 
-<!-- Leaflet -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-const API =
-  "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
-
-const map = L.map("map").setView([25.0375, 121.5637], 13);
+const map = L.map("map").setView([25.04, 121.53], 13);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap"
 }).addTo(map);
 
-let markers = [];
 let allData = [];
-
-function getColor(sbi, bemp) {
-  if (sbi === 0) return "yellow";
-  if (bemp === 0) return "red";
-  return "green";
-}
+let markers = [];
 
 function clearMarkers() {
   markers.forEach(m => map.removeLayer(m));
   markers = [];
 }
 
-function render(filterText = "") {
+function renderStations(keyword = "") {
   clearMarkers();
 
   allData
-    .filter(s =>
-      s.sna.includes(filterText)
-    )
-    .forEach(s => {
-      const color = getColor(s.sbi, s.bemp);
-
-      const html = `
-        <div class="circle ${color}">
-          <div>${s.sbi}</div>
-          <div class="line"></div>
-          <div>${s.bemp}</div>
-        </div>
-      `;
-
+    .filter(st => st.name.toLowerCase().includes(keyword.toLowerCase()))
+    .forEach(st => {
       const icon = L.divIcon({
-        html,
         className: "",
-        iconSize: [42, 42],
-        iconAnchor: [21, 21]
+        html: `
+          <div class="bike-circle ${st.color}">
+            <div>${st.available}</div>
+            <div class="divider"></div>
+            <div>${st.empty}</div>
+          </div>
+        `,
+        iconSize: [46, 46],
+        iconAnchor: [23, 23]
       });
 
-      const marker = L.marker([s.lat, s.lng], { icon }).addTo(map);
+      const marker = L.marker([st.lat, st.lng], { icon }).addTo(map);
 
       marker.bindPopup(`
-        <b>${s.sna}</b><br>
-        🚲 可借：${s.sbi}<br>
-        🅿️ 可還：${s.bemp}<br>
-        🔢 總車柱：${s.tot}
+        <div class="popup">
+          <b>${st.name}</b><br>
+          🚲 可借：${st.available}<br>
+          🅿️ 可還：${st.empty}<br>
+          🔢 車柱總數：${st.total}
+        </div>
       `);
 
       markers.push(marker);
     });
 }
 
-async function loadData() {
-  try {
-    const res = await fetch(API);
-    const data = await res.json();
-
-    allData = data.map(d => ({
-      sna: d.sna.replace("YouBike2.0_", ""),
-      sbi: Number(d.sbi),
-      bemp: Number(d.bemp),
-      tot: Number(d.tot),
-      lat: Number(d.lat),
-      lng: Number(d.lng)
-    }));
-
-    render(document.getElementById("search").value);
-
-    document.getElementById("updated").textContent =
-      "最後更新：" + new Date().toLocaleTimeString();
-  } catch (err) {
-    document.getElementById("updated").textContent =
-      "資料載入失敗";
-    console.error(err);
-  }
+/* 更新時間顯示 */
+function updateTimeLabel() {
+  const now = new Date();
+  const text = now.toLocaleString("zh-TW", { hour12: false });
+  document.getElementById("updateTime").innerText =
+    "🕒 最後更新：" + text;
 }
 
-document.getElementById("search").addEventListener("input", e => {
-  render(e.target.value);
+function loadYouBike() {
+  fetch("/api/youbike")
+    .then(res => res.json())
+    .then(data => {
+      allData = data;
+      renderStations(document.getElementById("searchBox").value);
+      updateTimeLabel();
+    })
+    .catch(err => {
+      console.error("資料載入失敗", err);
+    });
+}
+
+document.getElementById("searchBox").addEventListener("input", e => {
+  renderStations(e.target.value);
 });
 
-loadData();
-setInterval(loadData, 30000);
+loadYouBike();
+setInterval(loadYouBike, 30000);
 </script>
 
 </body>
 </html>
+
 
 
