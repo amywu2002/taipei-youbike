@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -6,47 +5,95 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>台北 YouBike 即時地圖</title>
 
-  <!-- Leaflet CSS -->
-  https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
+  <!-- ✅ Leaflet CSS（正確） -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
 
   <style>
-    body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
     #search {
-      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-      z-index: 1000; padding: 8px 12px; width: 260px; font-size: 16px;
-      border-radius: 8px; border: 1px solid #ccc; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.15);
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      padding: 8px 12px;
+      width: 260px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      background: #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,.15);
     }
+
     #count {
-      position: absolute; top: 12px; left: 12px; z-index: 1000;
-      background:#fff; padding:6px 10px; border:1px solid #ccc; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,.15); font-size:14px;
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 1000;
+      background: #fff;
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,.15);
+      font-size: 14px;
     }
-    #map { height: 100vh; width: 100%; }
+
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
+
     .circle {
-      width: 52px; height: 52px; border-radius: 50%; color: #fff;
-      text-align: center; font-size: 12px; line-height: 1.1;
-      padding-top: 6px; box-sizing: border-box; font-weight: bold;
-      border: 2px solid #fff; box-shadow: 0 0 4px rgba(0,0,0,.4);
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      color: #fff;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.1;
+      padding-top: 6px;
+      box-sizing: border-box;
+      font-weight: bold;
+      border: 2px solid #fff;
+      box-shadow: 0 0 4px rgba(0,0,0,.4);
     }
+
     .green  { background: #2ecc71; }
     .yellow { background: #f1c40f; color: #333; }
     .red    { background: #e74c3c; }
-    .divider { border-top: 1px solid rgba(255,255,255,.6); margin: 2px 6px; }
+
+    .divider {
+      border-top: 1px solid rgba(255,255,255,.6);
+      margin: 2px 6px;
+    }
   </style>
 </head>
+
 <body>
   <div id="count">站點：-- 筆</div>
   <input id="search" placeholder="搜尋場站名稱…" />
   <div id="map"></div>
 
-  <!-- Leaflet JS（一定要在你自己的 JS 之前） -->
-  https://unpkg.com/leaflet@1.9.4/dist/leaflet.js</script>
+  <!-- ✅ Leaflet JS（正確） -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    const API = "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
+    const API =
+      "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
 
     // 初始化地圖
     const map = L.map("map").setView([25.04, 121.53], 13);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap",
+    }).addTo(map);
 
     let markers = [];
     let rawData = [];
@@ -57,22 +104,6 @@
       markers = [];
     }
 
-    // 欄位容錯：同時支援縮寫版與全名版
-    function pickNumber(s, ...keys) {
-      for (const k of keys) {
-        const v = s[k];
-        if (v !== undefined && v !== null && v !== "") return Number(v);
-      }
-      return NaN;
-    }
-    function pickString(s, ...keys) {
-      for (const k of keys) {
-        const v = s[k];
-        if (v !== undefined && v !== null && v !== "") return String(v);
-      }
-      return "";
-    }
-
     function getColor(avail, empty) {
       if (avail === 0) return "yellow"; // 沒車可借
       if (empty === 0) return "red";    // 沒空位可還
@@ -80,21 +111,18 @@
     }
 
     function render(list) {
-      console.log("[render] 收到筆數：", list.length);
       clearMarkers();
-
       const bounds = [];
+
       list.forEach(s => {
-        // lat/lng 同時支援 lat/lng 與 latitude/longitude
-        const lat = pickNumber(s, "lat", "latitude");
-        const lng = pickNumber(s, "lng", "longitude");
+        // ✅ 同時支援 lat/lng 與 latitude/longitude
+        const lat = Number(s.lat ?? s.latitude);
+        const lng = Number(s.lng ?? s.longitude);
         if (isNaN(lat) || isNaN(lng)) return;
 
-        // 可借/可還/總柱 同時支援兩套欄位
-        const available = pickNumber(s, "sbi", "available_rent_bikes");
-        const empty     = pickNumber(s, "bemp", "available_return_bikes");
-        const total     = pickNumber(s, "tot", "quantity");
-        const name      = pickString(s, "sna"); // 名稱在兩套裡都叫 sna
+        const available = Number(s.sbi);
+        const empty     = Number(s.bemp);
+        const total     = Number(s.tot);
 
         const icon = L.divIcon({
           className: "",
@@ -102,26 +130,27 @@
           iconAnchor: [26, 26],
           html: `
             <div class="circle ${getColor(available, empty)}">
-              借 ${isNaN(available)? "-" : available}
+              借 ${available}
               <div class="divider"></div>
-              還 ${isNaN(empty)? "-" : empty}
+              還 ${empty}
             </div>
           `,
         });
 
         const marker = L.marker([lat, lng], { icon }).addTo(map);
         marker.bindPopup(`
-          <b>${name}</b><br>
-          🚲 可借：${isNaN(available)? "-" : available}<br>
-          🅿️ 可還：${isNaN(empty)? "-" : empty}<br>
-          📍 車柱總數：${isNaN(total)? "-" : total}
+          <b>${s.sna}</b><br>
+          🚲 可借：${available}<br>
+          🅿️ 可還：${empty}<br>
+          📍 車柱總數：${total}
         `);
 
         markers.push(marker);
         bounds.push([lat, lng]);
       });
 
-      document.getElementById("count").textContent = `站點：${markers.length} 筆`;
+      document.getElementById("count").textContent =
+        `站點：${markers.length} 筆`;
 
       if (bounds.length && !fitted) {
         map.fitBounds(bounds, { padding: [40, 40] });
@@ -135,7 +164,6 @@
         if (!res.ok) throw new Error(res.status);
         const data = await res.json();
 
-        console.log("[API] 取得筆數：", data.length, data[0]);
         rawData = data;
         render(data);
       } catch (err) {
@@ -144,12 +172,11 @@
       }
     }
 
-    document.getElementById("search").addEventListener("input", (e) => {
+    document.getElementById("search").addEventListener("input", e => {
       const keyword = e.target.value.trim();
-      const filtered = rawData.filter(s => {
-        const name = (s.sna ?? "").toString();
-        return name.includes(keyword);
-      });
+      const filtered = rawData.filter(
+        s => s.sna && s.sna.includes(keyword)
+      );
       render(filtered);
     });
 
