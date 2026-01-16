@@ -18,7 +18,7 @@ html, body {
   height: 100%;
 }
 
-/* ===== 上方 UI ===== */
+/* ===== UI（完全保留） ===== */
 .top-left {
   position: absolute;
   top: 12px;
@@ -51,43 +51,45 @@ html, body {
   box-shadow: 0 2px 6px rgba(0,0,0,.15);
 }
 
-/* ===== 水滴 Marker ===== */
-.yb-marker {
-  position: relative;
-  width: 46px;
-  height: 46px;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
-  border: 2px solid #fff;
-  box-shadow: 0 0 4px rgba(0,0,0,.4);
-}
-
-.yb-marker.green  { background: #7AC943; }
-.yb-marker.yellow { background: #F5A623; }
-.yb-marker.red    { background: #A80000; }
-
-.yb-inner {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  width: 34px;
-  height: 34px;
-  transform: rotate(45deg);
+/* ===== 桃園版水滴 Marker（關鍵） ===== */
+.yb-drop {
+  width: 52px;
+  height: 52px;
   color: #fff;
   font-weight: bold;
-  font-size: 13px;
+  font-size: 14px;
+  text-align: center;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  box-shadow: 0 0 4px rgba(0,0,0,.4);
+
+  /* 👇 關鍵：水滴形狀 */
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  transform: rotate(45deg);
+  position: relative;
+}
+
+/* 把內容轉正 */
+.yb-inner {
+  transform: rotate(-45deg) translateY(-2px);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  height: 100%;
 }
 
 .yb-line {
   width: 18px;
   height: 2px;
-  background: rgba(255,255,255,.8);
-  margin: 2px 0;
+  background: rgba(255,255,255,.85);
+  margin: 4px 0;
 }
+
+/* 顏色（官方感） */
+.green  { background: #7AC943; }
+.yellow { background: #F5A623; }
+.red    { background: #A80000; }
 </style>
 </head>
 
@@ -113,7 +115,6 @@ html, body {
 const API =
   "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
 
-/* 地圖 */
 const map = L.map("map").setView([25.04, 121.53], 13);
 map.zoomControl.setPosition("topright");
 
@@ -124,7 +125,6 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 let markers = [];
 let rawData = [];
 
-/* 狀態判斷 */
 function getStatus(borrow, ret) {
   if (ret === 0) return "red";
   if (borrow === 0) return "yellow";
@@ -151,10 +151,10 @@ function render(list) {
 
     const icon = L.divIcon({
       className: "",
-      iconSize: [46, 46],
-      iconAnchor: [23, 46],
+      iconSize: [52, 52],
+      iconAnchor: [26, 52],
       html: `
-        <div class="yb-marker ${status}">
+        <div class="yb-drop ${status}">
           <div class="yb-inner">
             <div>${borrow}</div>
             <div class="yb-line"></div>
@@ -164,19 +164,11 @@ function render(list) {
       `
     });
 
-    const marker = L.marker([lat, lng], { icon })
-      .addTo(map)
-      .bindPopup(`
-        <b>${s.sna}</b><br>
-        🚲 可借：${borrow}<br>
-        🅿️ 可還：${ret}
-      `);
-
+    const marker = L.marker([lat, lng], { icon }).addTo(map);
     markers.push(marker);
   });
 
-  document.getElementById("count").textContent =
-    `站點：${markers.length} 筆`;
+  count.textContent = `站點：${markers.length} 筆`;
 }
 
 function applyFilter() {
@@ -185,12 +177,11 @@ function applyFilter() {
 
   render(
     rawData.filter(s => {
-      const borrow = Number(s.available_rent_bikes);
-      const ret = Number(s.available_return_bikes);
-      const status = getStatus(borrow, ret);
-
+      const b = Number(s.available_rent_bikes);
+      const r = Number(s.available_return_bikes);
+      const st = getStatus(b, r);
       if (kw && !s.sna.includes(kw)) return false;
-      if (f !== "all" && status !== f) return false;
+      if (f !== "all" && st !== f) return false;
       return true;
     })
   );
@@ -199,7 +190,6 @@ function applyFilter() {
 search.addEventListener("input", applyFilter);
 filter.addEventListener("change", applyFilter);
 
-/* 載入資料 */
 async function load() {
   const res = await fetch(API, { cache: "no-store" });
   rawData = await res.json();
