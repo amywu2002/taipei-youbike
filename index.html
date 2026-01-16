@@ -13,8 +13,8 @@ https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
   #search {
     position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
     z-index: 1000; padding: 8px 12px; width: 260px; font-size: 16px;
-    border-radius: 8px; border: 1px solid #ccc; outline: none;
-    box-shadow: 0 2px 6px rgba(0,0,0,.15); background: #fff;
+    border-radius: 8px; border: 1px solid #ccc;
+    background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.15);
   }
   #map { height: 100vh; width: 100%; }
   .circle {
@@ -34,8 +34,8 @@ https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
 <input id="search" placeholder="搜尋場站名稱…" />
 <div id="map"></div>
 
-<!-- 正確引入 Leaflet JS：一定要用 <script src=...></script> -->
-<script/unpkg.com/leaflet@1.9.4/dist/leaflet.js</script>
+<!-- 🚨 正確的 Leaflet script，一定要這樣寫！ -->
+https://unpkg.com/leaflet@1.9.4/dist/leaflet.js
 
 <script>
 const API = "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
@@ -54,23 +54,22 @@ function clearMarkers() {
 }
 
 function getColor(avail, empty) {
-  if (avail === 0) return "yellow"; // 沒車可借
-  if (empty === 0) return "red";    // 沒空位可還
+  if (avail === 0) return "yellow";
+  if (empty === 0) return "red";
   return "green";
 }
 
 function render(list) {
   clearMarkers();
 
-  const bounds = [];
   list.forEach(s => {
     const lat = Number(s.lat);
     const lng = Number(s.lng);
     if (isNaN(lat) || isNaN(lng)) return;
 
-    const available = Number(s.sbi);   // 可借
-    const empty     = Number(s.bemp);  // 可還
-    const total     = Number(s.tot);   // 車柱總數
+    const available = Number(s.sbi);
+    const empty = Number(s.bemp);
+    const total = Number(s.tot);
 
     const icon = L.divIcon({
       className: "",
@@ -93,38 +92,24 @@ function render(list) {
     `);
 
     markers.push(marker);
-    bounds.push([lat, lng]);
   });
-
-  // 第一次載入自動縮放到所有站點
-  if (bounds.length && !render._fitted) {
-    map.fitBounds(bounds, { padding: [40, 40] });
-    render._fitted = true;
-  }
 }
 
 async function loadData() {
-  try {
-    const res = await fetch(API, { cache: "no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    rawData = data;
-    render(rawData);
-  } catch (e) {
-    console.error("資料載入失敗（API）", e);
-    alert("資料載入失敗（API）");
-  }
+  const res = await fetch(API, { cache: "no-store" });
+  const data = await res.json();
+  rawData = data;
+  render(data);
 }
 
 document.getElementById("search").addEventListener("input", e => {
   const keyword = e.target.value.trim();
-  render(
-    rawData.filter(s => s.sna && s.sna.includes(keyword))
-  );
+  render(rawData.filter(s => s.sna.includes(keyword)));
 });
 
 loadData();
 setInterval(loadData, 30000);
 </script>
+
 </body>
 </html>
