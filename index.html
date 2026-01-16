@@ -4,10 +4,7 @@
 <meta charset="UTF-8" />
 <title>台北 YouBike 即時地圖</title>
 
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
 <style>
 html, body {
@@ -21,6 +18,7 @@ html, body {
   height: 100%;
 }
 
+/* 🔝 上方工具列 */
 .top-bar {
   position: absolute;
   top: 12px;
@@ -30,38 +28,22 @@ html, body {
   padding: 6px 10px;
   border-radius: 8px;
   box-shadow: 0 2px 6px rgba(0,0,0,.3);
-}
-
-.yb-circle {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  color: #fff;
-  font-weight: bold;
-  font-size: 13px;
   display: flex;
-  flex-direction: column;
+  gap: 8px;
   align-items: center;
-  justify-content: center;
-  line-height: 1.1;
-  border: 2px solid #fff;
-  box-shadow: 0 0 4px rgba(0,0,0,.4);
 }
 
-.green  { background: #7AC943; }
-.yellow { background: #F5A623; }
-.red    { background: #A80000; }
-
-.line {
-  font-size: 15px;
-}
+/* 顏色（官方感） */
+.green  { --c:#7AC943; }
+.yellow { --c:#F5A623; }
+.red    { --c:#A80000; }
 </style>
 </head>
 
 <body>
 
 <div class="top-bar">
-  站點：
+  <span id="count">站點：--</span>
   <input id="search" placeholder="搜尋場站名稱">
 </div>
 
@@ -82,7 +64,7 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 let markers = [];
 let dataCache = [];
 
-/* 變色規則 */
+/* 顏色規則 */
 function getColor(borrow, ret) {
   if (ret === 0) return "red";
   if (borrow === 0) return "yellow";
@@ -94,6 +76,41 @@ function clearMarkers() {
   markers = [];
 }
 
+/* 🔥 核心：官方水滴 SVG Marker */
+function makeIcon(borrow, ret, colorClass) {
+  return L.divIcon({
+    className: "",
+    iconSize: [48, 60],
+    iconAnchor: [24, 56],
+    html: `
+      <div class="${colorClass}">
+        <svg viewBox="0 0 64 72" width="48" height="60">
+          <path
+            d="M32 2
+               C20 2 10 12 10 26
+               C10 44 32 68 32 68
+               C32 68 54 44 54 26
+               C54 12 44 2 32 2Z"
+            fill="var(--c)"
+            stroke="#fff"
+            stroke-width="3"
+          />
+          <text x="32" y="22" text-anchor="middle"
+                font-size="16" font-weight="700" fill="#fff">
+            ${borrow}
+          </text>
+          <line x1="20" y1="32" x2="44" y2="32"
+                stroke="#fff" stroke-width="2" opacity="0.85"/>
+          <text x="32" y="42" text-anchor="middle"
+                font-size="14" font-weight="600" fill="#fff">
+            ${ret}
+          </text>
+        </svg>
+      </div>
+    `
+  });
+}
+
 function render(data) {
   clearMarkers();
 
@@ -102,30 +119,10 @@ function render(data) {
     const lng = Number(s.longitude);
     const borrow = Number(s.available_rent_bikes);
     const ret    = Number(s.available_return_bikes);
-    const total  = borrow + ret;
 
-    // 🚧 防呆：任何一個不是數字就跳過
-    if (
-      Number.isNaN(lat) ||
-      Number.isNaN(lng) ||
-      Number.isNaN(borrow) ||
-      Number.isNaN(ret)
-    ) {
-      return;
-    }
+    if ([lat, lng, borrow, ret].some(Number.isNaN)) return;
 
-    const icon = L.divIcon({
-      className: "",
-      iconSize: [50, 50],
-      iconAnchor: [25, 25],
-      html: `
-        <div class="yb-circle ${getColor(borrow, ret)}">
-          <div>${borrow}</div>
-          <div class="line">—</div>
-          <div>${ret}</div>
-        </div>
-      `,
-    });
+    const icon = makeIcon(borrow, ret, getColor(borrow, ret));
 
     const marker = L.marker([lat, lng], { icon })
       .addTo(map)
@@ -133,11 +130,14 @@ function render(data) {
         <b>${s.sna}</b><br>
         🚲 可借：${borrow}<br>
         🅿️ 可還：${ret}<br>
-        📍 總車柱：${total}
+        📍 總車柱：${borrow + ret}
       `);
 
     markers.push(marker);
   });
+
+  document.getElementById("count").textContent =
+    `站點：${markers.length}`;
 }
 
 async function loadData() {
