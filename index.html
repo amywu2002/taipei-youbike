@@ -161,10 +161,10 @@ function render(list) {
       .addTo(map)
       .bindPopup(`
         <b>${s.sna}</b><br>
-        📍 ${s.ar || ""}<br>
-        🚲 可借：${borrow}<br>
-        🅿️ 可還：${ret}<br>
-        📦 總車柱：${borrow + ret}
+         ${s.ar || ""}<br>
+         可借：${borrow}<br>
+         可還：${ret}<br>
+         總車柱：${borrow + ret}
       `);
 
     markers.push(marker);
