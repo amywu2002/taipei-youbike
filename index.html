@@ -7,23 +7,18 @@
   <title>台北 YouBike 即時地圖</title>
 
   <!-- Leaflet CSS -->
-  <link://unpkg.com/leaflet@1.9.4/dist/leaflet.css
+  https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
 
   <style>
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
+    body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     #search {
       position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
       z-index: 1000; padding: 8px 12px; width: 260px; font-size: 16px;
-      border-radius: 8px; border: 1px solid #ccc; background: #fff;
-      box-shadow: 0 2px 6px rgba(0,0,0,.15);
+      border-radius: 8px; border: 1px solid #ccc; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.15);
     }
     #count {
       position: absolute; top: 12px; left: 12px; z-index: 1000;
-      background:#fff; padding:6px 10px; border:1px solid #ccc; border-radius:8px;
-      box-shadow:0 2px 6px rgba(0,0,0,.15); font-size:14px;
+      background:#fff; padding:6px 10px; border:1px solid #ccc; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,.15); font-size:14px;
     }
     #map { height: 100vh; width: 100%; }
     .circle {
@@ -51,9 +46,7 @@
 
     // 初始化地圖
     const map = L.map("map").setView([25.04, 121.53], 13);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap",
-    }).addTo(map);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
 
     let markers = [];
     let rawData = [];
@@ -64,6 +57,22 @@
       markers = [];
     }
 
+    // 欄位容錯：同時支援縮寫版與全名版
+    function pickNumber(s, ...keys) {
+      for (const k of keys) {
+        const v = s[k];
+        if (v !== undefined && v !== null && v !== "") return Number(v);
+      }
+      return NaN;
+    }
+    function pickString(s, ...keys) {
+      for (const k of keys) {
+        const v = s[k];
+        if (v !== undefined && v !== null && v !== "") return String(v);
+      }
+      return "";
+    }
+
     function getColor(avail, empty) {
       if (avail === 0) return "yellow"; // 沒車可借
       if (empty === 0) return "red";    // 沒空位可還
@@ -71,45 +80,48 @@
     }
 
     function render(list) {
-      console.log('[render] 進來的清單筆數：', list.length);
+      console.log("[render] 收到筆數：", list.length);
       clearMarkers();
 
       const bounds = [];
       list.forEach(s => {
-        const lat = Number(s.lat);
-        const lng = Number(s.lng);
+        // lat/lng 同時支援 lat/lng 與 latitude/longitude
+        const lat = pickNumber(s, "lat", "latitude");
+        const lng = pickNumber(s, "lng", "longitude");
         if (isNaN(lat) || isNaN(lng)) return;
 
-        const available = Number(s.sbi);
-        const empty     = Number(s.bemp);
-        const total     = Number(s.tot);
+        // 可借/可還/總柱 同時支援兩套欄位
+        const available = pickNumber(s, "sbi", "available_rent_bikes");
+        const empty     = pickNumber(s, "bemp", "available_return_bikes");
+        const total     = pickNumber(s, "tot", "quantity");
+        const name      = pickString(s, "sna"); // 名稱在兩套裡都叫 sna
 
         const icon = L.divIcon({
           className: "",
           iconSize: [52, 52],
-          iconAnchor: [26, 26], // 中心點對齊，非必要但較美觀
+          iconAnchor: [26, 26],
           html: `
             <div class="circle ${getColor(available, empty)}">
-              借 ${available}
+              借 ${isNaN(available)? "-" : available}
               <div class="divider"></div>
-              還 ${empty}
+              還 ${isNaN(empty)? "-" : empty}
             </div>
           `,
         });
 
         const marker = L.marker([lat, lng], { icon }).addTo(map);
         marker.bindPopup(`
-          <b>${s.sna}</b><br>
-          🚲 可借：${available}<br>
-          🅿️ 可還：${empty}<br>
-          📍 車柱總數：${total}
+          <b>${name}</b><br>
+          🚲 可借：${isNaN(available)? "-" : available}<br>
+          🅿️ 可還：${isNaN(empty)? "-" : empty}<br>
+          📍 車柱總數：${isNaN(total)? "-" : total}
         `);
 
         markers.push(marker);
         bounds.push([lat, lng]);
       });
 
-      document.getElementById('count').textContent = `站點：${markers.length} 筆`;
+      document.getElementById("count").textContent = `站點：${markers.length} 筆`;
 
       if (bounds.length && !fitted) {
         map.fitBounds(bounds, { padding: [40, 40] });
@@ -123,7 +135,7 @@
         if (!res.ok) throw new Error(res.status);
         const data = await res.json();
 
-        console.log('[YouBike] 取得資料筆數：', data.length, data[0]);
+        console.log("[API] 取得筆數：", data.length, data[0]);
         rawData = data;
         render(data);
       } catch (err) {
@@ -134,7 +146,10 @@
 
     document.getElementById("search").addEventListener("input", (e) => {
       const keyword = e.target.value.trim();
-      const filtered = rawData.filter(s => s.sna && s.sna.includes(keyword));
+      const filtered = rawData.filter(s => {
+        const name = (s.sna ?? "").toString();
+        return name.includes(keyword);
+      });
       render(filtered);
     });
 
@@ -143,4 +158,3 @@
   </script>
 </body>
 </html>
-``
