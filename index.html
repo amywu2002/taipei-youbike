@@ -1,170 +1,146 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>台北 YouBike 即時地圖</title>
 
-<!-- Leaflet CSS -->
 <link
   rel="stylesheet"
   href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
 />
 
 <style>
-  html, body {
-    margin: 0;
-    height: 100%;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  }
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
 
-  #map {
-    width: 100%;
-    height: 100%;
-  }
+#map {
+  width: 100%;
+  height: 100%;
+}
 
-  /* 搜尋框 */
-  .search-box {
-    position: absolute;
-    top: 12px;
-    left: 60px;
-    z-index: 1000;
-    background: white;
-    padding: 6px 10px;
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0,0,0,.3);
-  }
+.top-bar {
+  position: absolute;
+  top: 12px;
+  left: 60px;
+  z-index: 1000;
+  background: #fff;
+  padding: 6px 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.3);
+}
 
-  /* 圓圈 Marker */
-  .youbike-circle {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    color: #fff;
-    font-size: 13px;
-    font-weight: bold;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    line-height: 1.1;
-    border: 2px solid #fff;
-    box-shadow: 0 0 4px rgba(0,0,0,.4);
-  }
+.yb-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: bold;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+  border: 2px solid #fff;
+  box-shadow: 0 0 4px rgba(0,0,0,.4);
+}
 
-  .green  { background: #2ecc71; }
-  .yellow { background: #f1c40f; color: #333; }
-  .red    { background: #e74c3c; }
+.green  { background: #2ecc71; }
+.yellow { background: #f1c40f; color: #333; }
+.red    { background: #e74c3c; }
 
-  .line {
-    font-size: 10px;
-    margin: 1px 0;
-  }
+.line {
+  font-size: 10px;
+}
 </style>
 </head>
 
 <body>
 
-<div class="search-box">
+<div class="top-bar">
   站點：
-  <input id="searchInput" placeholder="搜尋場站名稱">
+  <input id="search" placeholder="搜尋場站名稱">
 </div>
 
 <div id="map"></div>
 
-<!-- Leaflet JS（一定要在使用 L 之前） -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  const API =
-    "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
+const API =
+  "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
 
-  // 初始化地圖
-  const map = L.map("map").setView([25.04, 121.53], 13);
+const map = L.map("map").setView([25.04, 121.53], 13);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "© OpenStreetMap",
-  }).addTo(map);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "© OpenStreetMap",
+}).addTo(map);
 
-  let markers = [];
-  let rawData = [];
+let markers = [];
+let dataCache = [];
 
-  // 🎨 依你指定的變色規則
-  function getColorClass(canBorrow, canReturn) {
-    if (canReturn === 0) return "red";    // 🔴 沒地方還
-    if (canBorrow === 0) return "yellow"; // 🟡 沒車可借
-    return "green";                       // 🟢 正常
-  }
+// 🎨 變色規則（已驗證）
+function getColor(borrow, ret) {
+  if (ret === 0) return "red";
+  if (borrow === 0) return "yellow";
+  return "green";
+}
 
-  function render(data) {
-    // 第一次才建立 marker
-    if (markers.length === 0) {
-      data.forEach(station => {
-        const marker = L.marker([Number(station.lat), Number(station.lng)])
-          .addTo(map);
-        marker.stationName = station.sna;
-        markers.push(marker);
-      });
-    }
+function render(data) {
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
 
-    // 更新每個 marker
-    data.forEach((station, i) => {
-      const canBorrow = Number(station.sbi);
-      const canReturn = Number(station.bemp);
-      const total     = Number(station.tot);
+  data.forEach(s => {
+    const borrow = Number(s.available_rent_bikes);
+    const ret    = Number(s.available_return_bikes);
+    const total  = Number(s.total);
 
-      const color = getColorClass(canBorrow, canReturn);
+    if (Number.isNaN(borrow) || Number.isNaN(ret)) return;
 
-      const html = `
-        <div class="youbike-circle ${color}">
-          <div>${canBorrow}</div>
+    const icon = L.divIcon({
+      className: "",
+      iconSize: [50, 50],
+      iconAnchor: [25, 25],
+      html: `
+        <div class="yb-circle ${getColor(borrow, ret)}">
+          <div>${borrow}</div>
           <div class="line">—</div>
-          <div>${canReturn}</div>
+          <div>${ret}</div>
         </div>
-      `;
+      `,
+    });
 
-      markers[i].setIcon(
-        L.divIcon({
-          html,
-          className: "",
-          iconSize: [50, 50],
-          iconAnchor: [25, 25],
-        })
-      );
-
-      markers[i].bindPopup(`
-        <b>${station.sna}</b><br>
-        🚲 可借：${canBorrow}<br>
-        🅿️ 可還：${canReturn}<br>
-        📍 總車位：${total}
+    const marker = L.marker([Number(s.lat), Number(s.lng)], { icon })
+      .addTo(map)
+      .bindPopup(`
+        <b>${s.sna}</b><br>
+        🚲 可借：${borrow}<br>
+        🅿️ 可還：${ret}<br>
+        📍 總車柱：${total}
       `);
-    });
-  }
 
-  async function loadData() {
-    const res = await fetch(API, { cache: "no-store" });
-    const data = await res.json();
-    rawData = data;
-    render(data);
-  }
-
-  // 初次載入
-  loadData();
-
-  // 🔄 每 30 秒更新
-  setInterval(loadData, 30000);
-
-  // 搜尋
-  document.getElementById("searchInput").addEventListener("input", e => {
-    const keyword = e.target.value.trim();
-
-    markers.forEach((marker, i) => {
-      if (rawData[i].sna.includes(keyword)) {
-        marker.addTo(map);
-      } else {
-        map.removeLayer(marker);
-      }
-    });
+    markers.push(marker);
   });
+}
+
+async function loadData() {
+  const res = await fetch(API, { cache: "no-store" });
+  const data = await res.json();
+  dataCache = data;
+  render(data);
+}
+
+document.getElementById("search").addEventListener("input", e => {
+  const kw = e.target.value.trim();
+  const filtered = dataCache.filter(s => s.sna.includes(kw));
+  render(filtered);
+});
+
+loadData();
+setInterval(loadData, 30000);
 </script>
 
 </body>
