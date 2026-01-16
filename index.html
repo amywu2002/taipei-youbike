@@ -1,187 +1,171 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>台北 YouBike 即時地圖</title>
+<meta charset="UTF-8" />
+<title>台北 YouBike 即時地圖</title>
 
-  <!-- ✅ Leaflet CSS（正確） -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+<!-- Leaflet CSS -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
 
-  <style>
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
 
-    #search {
-      position: absolute;
-      top: 12px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1000;
-      padding: 8px 12px;
-      width: 260px;
-      font-size: 16px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-      background: #fff;
-      box-shadow: 0 2px 6px rgba(0,0,0,.15);
-    }
+  #map {
+    width: 100%;
+    height: 100%;
+  }
 
-    #count {
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      z-index: 1000;
-      background: #fff;
-      padding: 6px 10px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,.15);
-      font-size: 14px;
-    }
+  /* 搜尋框 */
+  .search-box {
+    position: absolute;
+    top: 12px;
+    left: 60px;
+    z-index: 1000;
+    background: white;
+    padding: 6px 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.3);
+  }
 
-    #map {
-      height: 100vh;
-      width: 100%;
-    }
+  /* 圓圈 Marker */
+  .youbike-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 13px;
+    font-weight: bold;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    line-height: 1.1;
+    border: 2px solid #fff;
+    box-shadow: 0 0 4px rgba(0,0,0,.4);
+  }
 
-    .circle {
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      color: #fff;
-      text-align: center;
-      font-size: 12px;
-      line-height: 1.1;
-      padding-top: 6px;
-      box-sizing: border-box;
-      font-weight: bold;
-      border: 2px solid #fff;
-      box-shadow: 0 0 4px rgba(0,0,0,.4);
-    }
+  .green  { background: #2ecc71; }
+  .yellow { background: #f1c40f; color: #333; }
+  .red    { background: #e74c3c; }
 
-    .green  { background: #2ecc71; }
-    .yellow { background: #f1c40f; color: #333; }
-    .red    { background: #e74c3c; }
-
-    .divider {
-      border-top: 1px solid rgba(255,255,255,.6);
-      margin: 2px 6px;
-    }
-  </style>
+  .line {
+    font-size: 10px;
+    margin: 1px 0;
+  }
+</style>
 </head>
 
 <body>
-  <div id="count">站點：-- 筆</div>
-  <input id="search" placeholder="搜尋場站名稱…" />
-  <div id="map"></div>
 
-  <!-- ✅ Leaflet JS（正確） -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<div class="search-box">
+  站點：
+  <input id="searchInput" placeholder="搜尋場站名稱">
+</div>
 
-  <script>
-    const API =
-      "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
+<div id="map"></div>
 
-    // 初始化地圖
-    const map = L.map("map").setView([25.04, 121.53], 13);
+<!-- Leaflet JS（一定要在使用 L 之前） -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap",
-    }).addTo(map);
+<script>
+  const API =
+    "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
 
-    let markers = [];
-    let rawData = [];
-    let fitted = false;
+  // 初始化地圖
+  const map = L.map("map").setView([25.04, 121.53], 13);
 
-    function clearMarkers() {
-      markers.forEach(m => map.removeLayer(m));
-      markers = [];
-    }
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap",
+  }).addTo(map);
 
-    function getColor(avail, empty) {
-      if (avail === 0) return "yellow"; // 沒車可借
-      if (empty === 0) return "red";    // 沒空位可還
-      return "green";
-    }
+  let markers = [];
+  let rawData = [];
 
-    function render(list) {
-      clearMarkers();
-      const bounds = [];
+  // 🎨 依你指定的變色規則
+  function getColorClass(canBorrow, canReturn) {
+    if (canReturn === 0) return "red";    // 🔴 沒地方還
+    if (canBorrow === 0) return "yellow"; // 🟡 沒車可借
+    return "green";                       // 🟢 正常
+  }
 
-      list.forEach(s => {
-        // ✅ 同時支援 lat/lng 與 latitude/longitude
-        const lat = Number(s.lat ?? s.latitude);
-        const lng = Number(s.lng ?? s.longitude);
-        if (isNaN(lat) || isNaN(lng)) return;
-
-        const available = Number(s.sbi);
-        const empty     = Number(s.bemp);
-        const total     = Number(s.tot);
-
-        const icon = L.divIcon({
-          className: "",
-          iconSize: [52, 52],
-          iconAnchor: [26, 26],
-          html: `
-            <div class="circle ${getColor(available, empty)}">
-              借 ${available}
-              <div class="divider"></div>
-              還 ${empty}
-            </div>
-          `,
-        });
-
-        const marker = L.marker([lat, lng], { icon }).addTo(map);
-        marker.bindPopup(`
-          <b>${s.sna}</b><br>
-          🚲 可借：${available}<br>
-          🅿️ 可還：${empty}<br>
-          📍 車柱總數：${total}
-        `);
-
+  function render(data) {
+    // 第一次才建立 marker
+    if (markers.length === 0) {
+      data.forEach(station => {
+        const marker = L.marker([Number(station.lat), Number(station.lng)])
+          .addTo(map);
+        marker.stationName = station.sna;
         markers.push(marker);
-        bounds.push([lat, lng]);
       });
-
-      document.getElementById("count").textContent =
-        `站點：${markers.length} 筆`;
-
-      if (bounds.length && !fitted) {
-        map.fitBounds(bounds, { padding: [40, 40] });
-        fitted = true;
-      }
     }
 
-    async function loadData() {
-      try {
-        const res = await fetch(API, { cache: "no-store" });
-        if (!res.ok) throw new Error(res.status);
-        const data = await res.json();
+    // 更新每個 marker
+    data.forEach((station, i) => {
+      const canBorrow = Number(station.sbi);
+      const canReturn = Number(station.bemp);
+      const total     = Number(station.tot);
 
-        rawData = data;
-        render(data);
-      } catch (err) {
-        console.error("資料載入失敗", err);
-        alert("YouBike 資料載入失敗");
-      }
-    }
+      const color = getColorClass(canBorrow, canReturn);
 
-    document.getElementById("search").addEventListener("input", e => {
-      const keyword = e.target.value.trim();
-      const filtered = rawData.filter(
-        s => s.sna && s.sna.includes(keyword)
+      const html = `
+        <div class="youbike-circle ${color}">
+          <div>${canBorrow}</div>
+          <div class="line">—</div>
+          <div>${canReturn}</div>
+        </div>
+      `;
+
+      markers[i].setIcon(
+        L.divIcon({
+          html,
+          className: "",
+          iconSize: [50, 50],
+          iconAnchor: [25, 25],
+        })
       );
-      render(filtered);
-    });
 
-    loadData();
-    setInterval(loadData, 30000);
-  </script>
+      markers[i].bindPopup(`
+        <b>${station.sna}</b><br>
+        🚲 可借：${canBorrow}<br>
+        🅿️ 可還：${canReturn}<br>
+        📍 總車位：${total}
+      `);
+    });
+  }
+
+  async function loadData() {
+    const res = await fetch(API, { cache: "no-store" });
+    const data = await res.json();
+    rawData = data;
+    render(data);
+  }
+
+  // 初次載入
+  loadData();
+
+  // 🔄 每 30 秒更新
+  setInterval(loadData, 30000);
+
+  // 搜尋
+  document.getElementById("searchInput").addEventListener("input", e => {
+    const keyword = e.target.value.trim();
+
+    markers.forEach((marker, i) => {
+      if (rawData[i].sna.includes(keyword)) {
+        marker.addTo(map);
+      } else {
+        map.removeLayer(marker);
+      }
+    });
+  });
+</script>
+
 </body>
 </html>
