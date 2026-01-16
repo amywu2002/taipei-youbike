@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>台北 YouBike 即時地圖</title>
 
 <link
@@ -82,23 +82,37 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 let markers = [];
 let dataCache = [];
 
-// 🎨 變色規則（已驗證）
+/* 變色規則 */
 function getColor(borrow, ret) {
   if (ret === 0) return "red";
   if (borrow === 0) return "yellow";
   return "green";
 }
 
-function render(data) {
+function clearMarkers() {
   markers.forEach(m => map.removeLayer(m));
   markers = [];
+}
+
+function render(data) {
+  clearMarkers();
 
   data.forEach(s => {
+    const lat = Number(s.latitude);
+    const lng = Number(s.longitude);
     const borrow = Number(s.available_rent_bikes);
     const ret    = Number(s.available_return_bikes);
     const total  = Number(s.total);
 
-    if (Number.isNaN(borrow) || Number.isNaN(ret)) return;
+    // 🚧 防呆：任何一個不是數字就跳過
+    if (
+      Number.isNaN(lat) ||
+      Number.isNaN(lng) ||
+      Number.isNaN(borrow) ||
+      Number.isNaN(ret)
+    ) {
+      return;
+    }
 
     const icon = L.divIcon({
       className: "",
@@ -113,7 +127,7 @@ function render(data) {
       `,
     });
 
-    const marker = L.marker([Number(s.lat), Number(s.lng)], { icon })
+    const marker = L.marker([lat, lng], { icon })
       .addTo(map)
       .bindPopup(`
         <b>${s.sna}</b><br>
@@ -127,16 +141,19 @@ function render(data) {
 }
 
 async function loadData() {
-  const res = await fetch(API, { cache: "no-store" });
-  const data = await res.json();
-  dataCache = data;
-  render(data);
+  try {
+    const res = await fetch(API, { cache: "no-store" });
+    const data = await res.json();
+    dataCache = data;
+    render(data);
+  } catch (e) {
+    console.error("資料載入失敗", e);
+  }
 }
 
 document.getElementById("search").addEventListener("input", e => {
   const kw = e.target.value.trim();
-  const filtered = dataCache.filter(s => s.sna.includes(kw));
-  render(filtered);
+  render(dataCache.filter(s => s.sna.includes(kw)));
 });
 
 loadData();
