@@ -102,7 +102,7 @@ function render(data) {
     const lng = Number(s.longitude);
     const borrow = Number(s.available_rent_bikes);
     const ret    = Number(s.available_return_bikes);
-    const total  = Number(s.total);
+    const total  = borrow + ret;
 
     // 🚧 防呆：任何一個不是數字就跳過
     if (
