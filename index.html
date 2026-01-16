@@ -18,22 +18,40 @@ html, body {
   height: 100%;
 }
 
-/* 🔝 上方工具列 */
-.top-bar {
+/* ===== UI（桃園統一版） ===== */
+.top-left {
   position: absolute;
   top: 12px;
-  left: 60px;
+  left: 12px;
   z-index: 1000;
   background: #fff;
   padding: 6px 10px;
   border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,.3);
-  display: flex;
-  gap: 8px;
-  align-items: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,.25);
+  font-size: 14px;
 }
 
-/* 顏色（官方感） */
+.top-center {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  gap: 8px;
+}
+
+.top-center input,
+.top-center select {
+  padding: 8px 12px;
+  font-size: 15px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,.15);
+}
+
+/* ===== 顏色（官方） ===== */
 .green  { --c:#7AC943; }
 .yellow { --c:#F5A623; }
 .red    { --c:#A80000; }
@@ -42,9 +60,20 @@ html, body {
 
 <body>
 
-<div class="top-bar">
+<!-- 左上：站點數 -->
+<div class="top-left">
   <span id="count">站點：--</span>
-  <input id="search" placeholder="搜尋場站名稱">
+</div>
+
+<!-- 中上：搜尋 + 篩選 -->
+<div class="top-center">
+  <input id="search" placeholder="搜尋場站名稱…" />
+  <select id="filter">
+    <option value="all">全部</option>
+    <option value="green">正常</option>
+    <option value="yellow">無車</option>
+    <option value="red">無位</option>
+  </select>
 </div>
 
 <div id="map"></div>
@@ -55,7 +84,9 @@ html, body {
 const API =
   "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
 
+/* 地圖 */
 const map = L.map("map").setView([25.04, 121.53], 13);
+map.zoomControl.setPosition("topright");
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap",
@@ -76,7 +107,7 @@ function clearMarkers() {
   markers = [];
 }
 
-/* 🔥 核心：官方水滴 SVG Marker */
+/* ❗ 官方水滴 SVG（完全不動） */
 function makeIcon(borrow, ret, colorClass) {
   return L.divIcon({
     className: "",
@@ -111,10 +142,10 @@ function makeIcon(borrow, ret, colorClass) {
   });
 }
 
-function render(data) {
+function render(list) {
   clearMarkers();
 
-  data.forEach(s => {
+  list.forEach(s => {
     const lat = Number(s.latitude);
     const lng = Number(s.longitude);
     const borrow = Number(s.available_rent_bikes);
@@ -122,7 +153,8 @@ function render(data) {
 
     if ([lat, lng, borrow, ret].some(Number.isNaN)) return;
 
-    const icon = makeIcon(borrow, ret, getColor(borrow, ret));
+    const status = getColor(borrow, ret);
+    const icon = makeIcon(borrow, ret, status);
 
     const marker = L.marker([lat, lng], { icon })
       .addTo(map)
@@ -136,25 +168,34 @@ function render(data) {
     markers.push(marker);
   });
 
-  document.getElementById("count").textContent =
-    `站點：${markers.length}`;
+  count.textContent = `站點：${markers.length}`;
 }
+
+/* 搜尋 + 狀態篩選 */
+function applyFilter() {
+  const kw = search.value.trim();
+  const f = filter.value;
+
+  render(
+    dataCache.filter(s => {
+      const b = Number(s.available_rent_bikes);
+      const r = Number(s.available_return_bikes);
+      const st = getColor(b, r);
+      if (kw && !s.sna.includes(kw)) return false;
+      if (f !== "all" && st !== f) return false;
+      return true;
+    })
+  );
+}
+
+search.addEventListener("input", applyFilter);
+filter.addEventListener("change", applyFilter);
 
 async function loadData() {
-  try {
-    const res = await fetch(API, { cache: "no-store" });
-    const data = await res.json();
-    dataCache = data;
-    render(data);
-  } catch (e) {
-    console.error("資料載入失敗", e);
-  }
+  const res = await fetch(API, { cache: "no-store" });
+  dataCache = await res.json();
+  applyFilter();
 }
-
-document.getElementById("search").addEventListener("input", e => {
-  const kw = e.target.value.trim();
-  render(dataCache.filter(s => s.sna.includes(kw)));
-});
 
 loadData();
 setInterval(loadData, 30000);
