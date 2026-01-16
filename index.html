@@ -18,7 +18,7 @@ html, body {
   height: 100%;
 }
 
-/* ===== UI（桃園統一版） ===== */
+/* ===== UI（桃園版一致） ===== */
 .top-left {
   position: absolute;
   top: 12px;
@@ -62,12 +62,12 @@ html, body {
 
 <!-- 左上：站點數 -->
 <div class="top-left">
-  <span id="count">站點數：--</span>
+  <span id="count">站點：--</span>
 </div>
 
-<!-- 中上：搜尋 + 篩選 -->
+<!-- 上方置中：搜尋 + 篩選 -->
 <div class="top-center">
-  <input id="search" placeholder="搜尋場站名稱…" />
+  <input id="search" placeholder="搜尋場站名稱或地址…" />
   <select id="filter">
     <option value="all">全部</option>
     <option value="green">正常</option>
@@ -81,6 +81,7 @@ html, body {
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
+/* 台北官方 API（完全不動） */
 const API =
   "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
 
@@ -107,7 +108,7 @@ function clearMarkers() {
   markers = [];
 }
 
-/* ❗ 官方水滴 SVG（完全不動） */
+/* 官方水滴 SVG（鎖定，不再動） */
 function makeIcon(borrow, ret, colorClass) {
   return L.divIcon({
     className: "",
@@ -160,18 +161,19 @@ function render(list) {
       .addTo(map)
       .bindPopup(`
         <b>${s.sna}</b><br>
+        📍 ${s.ar || ""}<br>
         🚲 可借：${borrow}<br>
         🅿️ 可還：${ret}<br>
-        📍 總車柱：${borrow + ret}
+        📦 總車柱：${borrow + ret}
       `);
 
     markers.push(marker);
   });
 
-  count.textContent = `站點數：${markers.length}`;
+  count.textContent = `站點：${markers.length} 筆`;
 }
 
-/* 搜尋 + 狀態篩選 */
+/* 🔍 搜尋（名稱 + 地址）＋ 狀態篩選 */
 function applyFilter() {
   const kw = search.value.trim();
   const f = filter.value;
@@ -181,8 +183,15 @@ function applyFilter() {
       const b = Number(s.available_rent_bikes);
       const r = Number(s.available_return_bikes);
       const st = getColor(b, r);
-      if (kw && !s.sna.includes(kw)) return false;
+
+      if (kw) {
+        const name = s.sna || "";
+        const addr = s.ar || "";
+        if (!name.includes(kw) && !addr.includes(kw)) return false;
+      }
+
       if (f !== "all" && st !== f) return false;
+
       return true;
     })
   );
@@ -191,6 +200,7 @@ function applyFilter() {
 search.addEventListener("input", applyFilter);
 filter.addEventListener("change", applyFilter);
 
+/* 載入資料 */
 async function loadData() {
   const res = await fetch(API, { cache: "no-store" });
   dataCache = await res.json();
