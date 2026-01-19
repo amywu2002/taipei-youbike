@@ -208,14 +208,14 @@ function render() {
       .bindPopup(`
         <b>${s.name}</b><br>
         地址：${s.addr}<br>
-        🚲 可借：${s.borrow}<br>
-        🅿️ 可還：${s.ret}
+        可借：${s.borrow}<br>
+        可還：${s.ret}
       `);
 
     markers.push(marker);
   });
 
-  count.textContent = `站點：${markers.length} 筆`;
+  count.textContent = `站點：${markers.length} `;
 }
 
 /* ===== 資料載入（台北） ===== */
