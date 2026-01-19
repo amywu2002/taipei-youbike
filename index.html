@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8" />
-<title>YouBike 即時地圖（台北 / 新北）</title>
+<title>台北 YouBike 即時地圖</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
@@ -18,7 +18,7 @@ html, body {
   height: 100%;
 }
 
-/* ===== UI（桃園一致） ===== */
+/* ===== UI（桃園版一致） ===== */
 .top-left {
   position: absolute;
   top: 12px;
@@ -51,33 +51,23 @@ html, body {
   box-shadow: 0 2px 6px rgba(0,0,0,.15);
 }
 
-/* ===== 官方色 ===== */
+/* ===== 顏色（官方） ===== */
 .green  { --c:#7AC943; }
 .yellow { --c:#F5A623; }
 .red    { --c:#A80000; }
-
-/* Leaflet icon 背景移除 */
-.leaflet-div-icon {
-  background: transparent !important;
-  border: none !important;
-}
 </style>
 </head>
 
 <body>
 
+<!-- 左上：站點數 -->
 <div class="top-left">
   <span id="count">站點：--</span>
 </div>
 
+<!-- 上方置中：搜尋 + 篩選 -->
 <div class="top-center">
-  <select id="city">
-    <option value="taipei">台北</option>
-    <option value="ntpc">新北</option>
-  </select>
-
   <input id="search" placeholder="搜尋場站名稱或地址…" />
-
   <select id="filter">
     <option value="all">全部</option>
     <option value="green">正常</option>
@@ -91,27 +81,25 @@ html, body {
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-/* API */
-const API = {
-  taipei: "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json",
-  ntpc: "https://data.ntpc.gov.tw/api/datasets/71CD1490-A2DF-4198-BEF1-318479775E8A/json"
-};
+/* 台北官方 API（完全不動） */
+const API =
+  "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
 
 /* 地圖 */
-const map = L.map("map").setView([25.04, 121.53], 12);
+const map = L.map("map").setView([25.04, 121.53], 13);
 map.zoomControl.setPosition("topright");
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap",
 }).addTo(map);
 
-let dataCache = [];
 let markers = [];
+let dataCache = [];
 
 /* 顏色規則 */
-function getColor(b, r) {
-  if (r === 0) return "red";
-  if (b === 0) return "yellow";
+function getColor(borrow, ret) {
+  if (ret === 0) return "red";
+  if (borrow === 0) return "yellow";
   return "green";
 }
 
@@ -120,17 +108,18 @@ function clearMarkers() {
   markers = [];
 }
 
-/* 官方水滴（鎖定） */
-function makeIcon(borrow, ret, color) {
+/* 官方水滴 SVG（鎖定，不再動） */
+function makeIcon(borrow, ret, colorClass) {
   return L.divIcon({
     className: "",
     iconSize: [48, 60],
     iconAnchor: [24, 56],
     html: `
-      <div class="${color}">
+      <div class="${colorClass}">
         <svg viewBox="0 0 64 72" width="55" height="60">
           <path
-            d="M32 2 C20 2 10 12 10 26
+            d="M32 2
+               C20 2 10 12 10 26
                C10 44 32 68 32 68
                C32 68 54 44 54 26
                C54 12 44 2 32 2Z"
@@ -139,86 +128,85 @@ function makeIcon(borrow, ret, color) {
             stroke-width="3"
           />
           <text x="32" y="22" text-anchor="middle"
-            font-size="16" font-weight="700" fill="#fff">${borrow}</text>
+                font-size="16" font-weight="700" fill="#fff">
+            ${borrow}
+          </text>
           <line x1="20" y1="28" x2="44" y2="28"
-            stroke="#fff" stroke-width="2" opacity="0.85"/>
+                stroke="#fff" stroke-width="2" opacity="0.85"/>
           <text x="32" y="44" text-anchor="middle"
-            font-size="16" font-weight="600" fill="#fff">${ret}</text>
+                font-size="16" font-weight="600" fill="#fff">
+            ${ret}
+          </text>
         </svg>
-      </div>`
+      </div>
+    `
   });
 }
 
-/* 轉成統一格式 */
-function normalize(raw, city) {
-  if (city === "taipei") {
-    return raw.map(s => ({
-      lat: s.latitude,
-      lng: s.longitude,
-      sna: s.sna,
-      ar: s.ar,
-      b: s.available_rent_bikes,
-      r: s.available_return_bikes
-    }));
-  } else {
-    return raw.map(s => ({
-      lat: s.lat,
-      lng: s.lng,
-      sna: s.sna,
-      ar: s.ar,
-      b: s.sbi,
-      r: s.bemp
-    }));
-  }
-}
-
-/* 篩選 + 繪製 */
-function applyFilter() {
+function render(list) {
   clearMarkers();
 
-  const kw = search.value.trim();
-  const f = filter.value;
-
-  const list = dataCache.filter(s => {
-    const st = getColor(s.b, s.r);
-
-    if (kw && !s.sna.includes(kw) && !s.ar.includes(kw)) return false;
-    if (f !== "all" && st !== f) return false;
-
-    return true;
-  });
-
   list.forEach(s => {
-    const icon = makeIcon(s.b, s.r, getColor(s.b, s.r));
-    const marker = L.marker([s.lat, s.lng], { icon })
+    const lat = Number(s.latitude);
+    const lng = Number(s.longitude);
+    const borrow = Number(s.available_rent_bikes);
+    const ret    = Number(s.available_return_bikes);
+
+    if ([lat, lng, borrow, ret].some(Number.isNaN)) return;
+
+    const status = getColor(borrow, ret);
+    const icon = makeIcon(borrow, ret, status);
+
+    const marker = L.marker([lat, lng], { icon })
       .addTo(map)
       .bindPopup(`
         <b>${s.sna}</b><br>
-        📍 ${s.ar}<br>
-        🚲 可借：${s.b}<br>
-        🅿️ 可還：${s.r}
+         地址：${s.ar || ""}<br>
+         可借：${borrow}<br>
+         可還：${ret}<br>
+         總車柱：${borrow + ret}
       `);
+
     markers.push(marker);
   });
 
   count.textContent = `站點：${markers.length} 筆`;
 }
 
+/* 🔍 搜尋（名稱 + 地址）＋ 狀態篩選 */
+function applyFilter() {
+  const kw = search.value.trim();
+  const f = filter.value;
+
+  render(
+    dataCache.filter(s => {
+      const b = Number(s.available_rent_bikes);
+      const r = Number(s.available_return_bikes);
+      const st = getColor(b, r);
+
+      if (kw) {
+        const name = s.sna || "";
+        const addr = s.ar || "";
+        if (!name.includes(kw) && !addr.includes(kw)) return false;
+      }
+
+      if (f !== "all" && st !== f) return false;
+
+      return true;
+    })
+  );
+}
+
+search.addEventListener("input", applyFilter);
+filter.addEventListener("change", applyFilter);
+
 /* 載入資料 */
 async function loadData() {
-  const city = document.getElementById("city").value;
-  const res = await fetch(API[city], { cache: "no-store" });
-  const raw = await res.json();
-  dataCache = normalize(raw, city);
+  const res = await fetch(API, { cache: "no-store" });
+  dataCache = await res.json();
   applyFilter();
 }
 
-/* 事件 */
-search.addEventListener("input", applyFilter);
-filter.addEventListener("change", applyFilter);
-city.addEventListener("change", loadData);
-
-/* init */
 loadData();
 setInterval(loadData, 30000);
 </script>
