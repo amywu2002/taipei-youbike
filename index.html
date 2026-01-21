@@ -21,6 +21,18 @@ body {
 /* 左上 */
 #count {
   position: absolute;
+  top: 120px;
+  left: 12px;
+  z-index: 1000;
+  background: #fff;
+  padding: 6px 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  font-size: 14px;
+}
+  
+#city {
+  position: absolute;
   top: 12px;
   left: 12px;
   z-index: 1000;
@@ -30,7 +42,7 @@ body {
   box-shadow: 0 2px 6px rgba(0,0,0,.15);
   font-size: 14px;
 }
-
+  
 /* 上方控制 */
 #controls {
   position: absolute;
@@ -89,7 +101,7 @@ body {
 <body>
 
 <div id="count">站點：--</div>
-
+<div id="city">臺北市
 <div id="controls">
   <input id="search" placeholder="搜尋站點名稱或地址…" />
 
