@@ -218,10 +218,10 @@ function render() {
   count.textContent = `站點：${markers.length}站`;
 }
 
-/* ===== 資料載入（台北） ===== */
-fetch(TAIPEI_API)
-  .then(r => r.json())
-  .then(j => {
+// === 每 30 秒自動更新資料 ===
+setInterval(() => {
+
+  fetch(TAIPEI_API).then(r => r.json()).then(j => {
     dataTP = j.map(s => ({
       name: s.sna,
       addr: s.ar || "",
@@ -232,6 +232,9 @@ fetch(TAIPEI_API)
     }));
     render();
   });
+}, 30000);
+;
+
 
 search.addEventListener("input", render);
 statusFilter.addEventListener("change", render);
