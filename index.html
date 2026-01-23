@@ -76,10 +76,19 @@ body {
   width: 100%;
 }
 
-/* === 以下 marker / leaflet 原樣保留 === */
-.marker.green  { --c:#7AC943; }
-.marker.yellow { --c:#F5A623; }
-.marker.red    { --c:#A80000; }
+/* ===== marker 顏色（與桃園完全一致） ===== */
+.marker.green  {
+  --fill: #2DBE60;
+  --stroke: #1E7F42;
+}
+.marker.yellow {
+  --fill: #F2A31B;
+  --stroke: #B87400;
+}
+.marker.red    {
+  --fill: #E64545;
+  --stroke: #9E2A2A;
+}
 
 .leaflet-div-icon {
   background: transparent !important;
@@ -87,8 +96,8 @@ body {
 }
 
 .marker svg {
-  width: 60px;
-  height: 68px;
+  width: 56px;
+  height: 56px;
 }
 
 .leaflet-top.leaflet-left {
@@ -148,11 +157,9 @@ body {
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-/* ===== API（原樣） ===== */
 const TAIPEI_API =
   "https://tcgbusfs.blob.core.windows.net/dotapp/youbike/v2/youbike_immediate.json";
 
-/* ===== 地圖（原樣） ===== */
 const map = L.map("map").setView([25.03, 121.55], 11);
 map.zoomControl.setPosition("topright");
 
@@ -167,7 +174,6 @@ let markers = [];
 let dataTP = [];
 let userMarker = null;
 
-/* ===== 使用者定位（原樣） ===== */
 if (navigator.geolocation) {
   navigator.geolocation.getCurrentPosition(pos => {
     userMarker = L.marker(
@@ -185,7 +191,6 @@ if (navigator.geolocation) {
   });
 }
 
-/* ===== 工具（原樣） ===== */
 function clearMarkers() {
   markers.forEach(m => map.removeLayer(m));
   markers = [];
@@ -197,26 +202,26 @@ function getStatus(b, r) {
   return "green";
 }
 
+/* ===== 改成與桃園一樣的圓形 marker ===== */
 function makeMarkerHTML(b, r, status) {
   return `
     <div class="marker ${status}">
-      <svg viewBox="0 0 64 72">
-        <path d="M32 2 C20 2 10 12 10 26
-                 C10 44 32 68 32 68
-                 C32 68 54 44 54 26
-                 C54 12 44 2 32 2Z"
-          fill="var(--c)" stroke="#fff" stroke-width="3"/>
-        <line x1="20" y1="30" x2="44" y2="30"
-          stroke="#fff" stroke-width="2"/>
-        <text x="32" y="24" text-anchor="middle"
-          font-size="16" font-weight="700" fill="#fff">${b}</text>
-        <text x="32" y="48" text-anchor="middle"
-          font-size="16" font-weight="600" fill="#fff">${r}</text>
+      <svg viewBox="0 0 64 64">
+        <circle cx="32" cy="32" r="28"
+          fill="var(--fill)"
+          stroke="var(--stroke)"
+          stroke-width="4"/>
+        <line x1="18" y1="32" x2="46" y2="32"
+          stroke="#000"
+          stroke-width="2"/>
+        <text x="32" y="26" text-anchor="middle"
+          font-size="18" font-weight="700" fill="#000">${b}</text>
+        <text x="32" y="50" text-anchor="middle"
+          font-size="18" font-weight="700" fill="#000">${r}</text>
       </svg>
     </div>`;
 }
 
-/* ===== Render（原樣） ===== */
 function render() {
   clearMarkers();
 
@@ -237,8 +242,8 @@ function render() {
     .forEach(s => {
       const marker = L.marker([s.lat, s.lng], {
         icon: L.divIcon({
-          iconSize: [60, 68],
-          iconAnchor: [30, 68],
+          iconSize: [56, 56],
+          iconAnchor: [28, 28],
           html: makeMarkerHTML(s.borrow, s.ret, getStatus(s.borrow, s.ret))
         })
       })
@@ -256,26 +261,24 @@ function render() {
   count.textContent = `筆數：${markers.length}`;
 }
 
-/* ===== 載入資料（邏輯原樣，只補 UI） ===== */
 function loadData() {
-  Promise.all([
-    fetch(TAIPEI_API).then(r => r.json())
-  ]).then(([ty, nt, tp]) => {
+  fetch(TAIPEI_API)
+    .then(r => r.json())
+    .then(tp => {
+      dataTP = tp.map(s => ({
+        name: s.sna,
+        addr: s.ar || "",
+        lat: +s.latitude,
+        lng: +s.longitude,
+        borrow: +s.available_rent_bikes,
+        ret: +s.available_return_bikes
+      }));
 
-    dataTP = tp.map(s => ({
-      name: s.sna,
-      addr: s.ar || "",
-      lat: +s.latitude,
-      lng: +s.longitude,
-      borrow: +s.available_rent_bikes,
-      ret: +s.available_return_bikes
-    }));
+      lastUpdate.textContent =
+        "最後更新：" + new Date().toLocaleString();
 
-    lastUpdate.textContent =
-      "最後更新：" + new Date().toLocaleString();
-
-    render();
-  });
+      render();
+    });
 }
 
 loadData();
@@ -288,7 +291,6 @@ interval.addEventListener("change", e => {
 });
 
 refresh.addEventListener("click", loadData);
-
 search.addEventListener("input", render);
 statusFilter.addEventListener("change", render);
 city.addEventListener("change", render);
@@ -296,4 +298,3 @@ city.addEventListener("change", render);
 
 </body>
 </html>
-
