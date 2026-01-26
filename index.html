@@ -76,19 +76,10 @@ body {
   width: 100%;
 }
 
-/* ===== marker 顏色（與桃園完全一致） ===== */
-.marker.green  {
-  --fill: #2DBE60;
-  --stroke: #1E7F42;
-}
-.marker.yellow {
-  --fill: #F2A31B;
-  --stroke: #B87400;
-}
-.marker.red    {
-  --fill: #E64545;
-  --stroke: #9E2A2A;
-}
+/* ===== marker 顏色 ===== */
+.marker.green  { --fill: #2DBE60; --stroke: #1E7F42; }
+.marker.yellow { --fill: #F2A31B; --stroke: #B87400; }
+.marker.red    { --fill: #E64545; --stroke: #9E2A2A; }
 
 .leaflet-div-icon {
   background: transparent !important;
@@ -194,12 +185,12 @@ function clearMarkers() {
 }
 
 function getStatus(b, r) {
-  if (r === 0) return "red";
+  if (b === 0 && r === 0) return "red";
   if (b === 0) return "yellow";
+  if (r === 0) return "red";
   return "green";
 }
 
-/* ===== 改成與桃園一樣的圓形 marker ===== */
 function makeMarkerHTML(b, r, status) {
   return `
     <div class="marker ${status}">
@@ -287,10 +278,14 @@ interval.addEventListener("change", e => {
   if (sec > 0) timer = setInterval(loadData, sec * 1000);
 });
 
-refresh.addEventListener("click", loadData);
+/* 🔧 這行原本會讓 JS 中斷，已註解 */
+// refresh.addEventListener("click", loadData);
+
 search.addEventListener("input", render);
-statusFilter.addEventListener("change", loadData);
 city.addEventListener("change", render);
+
+/* 🔧 狀態切換立刻更新 */
+statusFilter.addEventListener("change", loadData);
 </script>
 
 </body>
